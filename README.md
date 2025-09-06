@@ -4,10 +4,69 @@ This is adaptation of [FV1Buddy tap tempo module](https://github.com/ElectricCan
 for use with [Hydra multi-head Delay by PedalPCB](https://www.pedalpcb.com/product/pcb238/)
 (also available as a [kit at musikding.de](https://www.musikding.de/Hydra-Delay-kit)).
 
-`FV1Buddy` was not finished and some parts haven't work at the fork time.
+**NOTE:** this project is not fully finished yet. Firmware generally works, but
+is under testing still. One additional feature is in my head also.
+HW part is also under testing, schematic will be updated once HW is finished and PCB designed then.
 
-**NOTE:** this project is not fully finished yet, firmware works, but is under testing still (and some additional feature is planned also).
-HW part is under testing also, schematics will be updated and PCB designed then.
+**Tip:** You can use my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) for tis project.
+
+## Features
+
+- Delay time/tempo can be controlled by `Time Pot` or tapped by `Tap Button`.
+- Tap `Tap Button` at least two times to switch from `Time Pot` controll to `Tap Button` conntroll.
+  - Second tap must follow under 1,7s after first one.
+  - Subsequent tap times are averaged until tapping finishes.
+  - Tapping finishes if next tap is not performed for at least 3 times of the currently
+    tapped tempo - `LED` blinks in the tapped tempo then
+- Move `Time Pot` at least 5% to switch controll back to it - `LED` is on without blinking then
+- `Tap to Head switch` (optional)
+  - selects if tapped tempo targets _Head 2_ or _Head 4_. Tapping
+    to _Head 2_ allows you easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
+  - switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
+- current `Time Pot` or `Tap Button` controll mode, together with the tapped tempo, is persisted over pedal power-off.
+
+## Applying module into Hydra effect
+
+It is really easy:
+
+- Plan tap tempo module and all new controls placement in the pedal enclosure. Use
+  long enough wires for the placeent.
+- Do not solder `Speed` pot to the Hydra PCB, but connect its pads to the module instead:
+  - right most square one to `GND` - ground for the module.
+  - center one to `VOUT` - tempo voltage from the module back to the Hydra.
+  - left one to `PWR` - 3,3V power for the module.
+- `Time Pot` - connect `Speed` pot to the module's `TPOT1`, `TPOT2` and `TPOT3`.
+  Use `B` type pot, from `B10k` up to Hydra's original `B100k`.
+  Use `Time` or `Speed` or `Delay` label for the pot as you prefer ;-)
+- `Tap Button` - connect momentary button to the module's `TBTN1` and `TBTN2`.
+- `LED` - connect LED to the module's `TLED+` and `TLED-`. Use `TR1` trimmer to set LED's brightness. Used 2k value should.
+  be OK for the most LED types, if too small for your LED, use higher trimmer value, or connect additional resistor.
+  in series.
+- `Tap to Head` switch - optional, single on/off or on/on switch, connect it to the module's `THSW1` and `THSW2`. Pads connected together is tapping to _Head 2_.
+
+**ToDo** Image How to connect taptempo module to Hydra PCB
+
+## Building module
+
+**ToDo** schematics image
+
+**ToDo** BOM
+
+**ToDo** PCB image
+
+## Project Content
+
+- **ToDo** `.hex` - firmware binary
+- **ToDo** `_geber.zip` - Gerber file for PCB fabrication
+- `firmware/` - VSCode/[PlatformIO](https://docs.platformio.org/en/latest/platforms/atmelmegaavr.html) project with firmware
+- `FV1BuddyForHydra.dch` - updated schematics
+- **ToDo** `.dip` - PCB design file
+
+Schematics and PCB design file can be opened/edited by [DipTrace](https://diptrace.com/).
+
+## Changes from FV1Buddy
+
+`FV1Buddy` was forked in June 2025. It was not finished and some code parts didn't work correctly at the fork time.
 
 Functional changes:
 
@@ -31,58 +90,7 @@ Non-functional changes:
 - Distinct code optimizatios.
 - Lots of comments added as I learnt the code.
 
-All changes are marker by `MOD:` comment in the source code as accuratelly as possible.
-
-## Features
-
-- Delay time/tempo can be controlled by `Time Pot` or `Tap Button`
-- Use `Tap Button` at least two times to switch from `Time Pot` controll to `Tqp Button` conntroll.
-  - Second tap must be earlier than 1,7s
-  - Subsequent tap times are averaged until tapping finishes
-  - Tapping finishes if next tap is not performed for at least 3 times of the currently
-    tapped tempo - `LED` blinks in the tapped tempo then
-- Move `Time Pot` at least 5% to switch controll back to it - `LED` is on without blinking then
-- `Tap to Head switch` (optional)
-  - selects if tempo tapped by `Tap Button` targets _Head 2_ or _Head 4_. Tapping
-    to _Head 2_ allows you easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
-  - change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
-- current `Time Pot` or `Tap Button` controll mode, together with tapped-in temp, is persisted over the pedal power-off.
-
-## Applying module into Hydra
-
-It is really easy:
-
-- Do not solder `Speed` pot to the Hydra PCB, but connect its pads to the module instead:
-  - right most square one to `GND` - ground for the module
-  - center one to `VOUT` - tempo voltage from the module back to the Hydra
-  - left one to `PWR` - 3,3V power for the module
-- `Time Pot` - connect Hydra's original `B100k` value `Speed` pot to the module's `TPOT1`, `TPOT2` and `TPOT3`.
-  Use `Time` or `Speed` or `Delay` label for the pot as you prefer ;-)
-- `Tap Button` - connect Momentary button to the module's `TBTN1` and `TBTN2`.
-- `LED` - connect LED to the module's `TLED+` and `TLED-`. Use `TR1` trimmer to set LED's brightness. Used 2k value should
-  be OK for the most LED types, if too small for your LED, use higher trimmer value, or connect additional resistor
-  in series.
-- `Tap to Head switch` - optional, simple on/off switch (on/on can be used also), connect it to the module's `THSW1` and `THSW2`.
-
-**ToDo** Image How to connect taptempo module to Hydra PCB
-
-## Building module
-
-**ToDo** schematics image
-
-**ToDo** BOM
-
-**ToDo** PCB image
-
-## Project Content
-
-- **ToDo** `.hex` - firmware binary
-- **ToDo** `_geber.zip` - Gerber file for PCB fabrication
-- `firmware/` - VSCode/[PlatformIO](https://docs.platformio.org/en/latest/platforms/atmelmegaavr.html) project with firmware
-- `FV1BuddyForHydra.dch` - updated schematics
-- **ToDo** `.dip` - PCB design file
-
-Schematics and PCB design file can be opened/edited by [DipTrace](https://diptrace.com/).
+All changes are marker by `MOD:` comment in the source code as accurate as possible.
 
 ## License
 
