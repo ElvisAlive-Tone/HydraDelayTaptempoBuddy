@@ -58,12 +58,18 @@
 const uint16_t EEPROM_TAP = 0x1400;   // one byte to store `tap` variable
 const uint16_t EEPROM_TEMPO = 0x1401; // two bytes to store `mstempo` variable
 
+// MOD: store firmware revision info into uC binary code for further reference.
+// Must be volatile to be kept by compiler.
+// Starts by `rev ` to find it more easily in the binary.
+volatile char revision[] = "rev 0.1";
+
 volatile uint16_t pot;       // current Pot value is stored here from ADC by interrupt handler
 volatile uint16_t pwm = 500; // current value of PWM output (between 0 and PWM_MAX) to be set into TCA in its interrupt handler
 volatile uint16_t ms;        // time [ms] counter for Tap button pressed length and delayed `tap` reset in EEPROM respectively. Incremented in TCA interrupt.
 volatile uint16_t ledms;     // time [ms] counter for LED blinking. Incremented in TCA interrupt.
 
 // This set of fuses will deactivate the reset, it will be impossible to reprogram the chip without high voltage programming
+// MOD: commented out as we do not need to change fuses, and it is even done another way in platform.io
 // FUSES = {
 // .WDTCFG = 0x00,  // WDTCFG {PERIOD=OFF, WINDOW=OFF} - DEFAULT VALUE
 // .BODCFG = 0x00,  // BODCFG {SLEEP=DIS, ACTIVE=DIS, SAMPFREQ=1KHz, LVL=BODLEVEL0} - DEFAULT VALUE
@@ -172,7 +178,7 @@ uint8_t debounce(void)
     return (0);
 }
 
-// MOD: Div switch debounce with 900us time
+// MOD: Div switch debounce with 900us time, conversion into `divmult` value
 uint8_t divmult_from_diwsw(void)
 {
     if (!(PORTA.IN & (1 << DIV_PIN)))
@@ -197,7 +203,7 @@ void blink(void)
     _delay_ms(150);
 }
 
-// persist NVM Page changes into EEPROM
+// MOD: persist NVM Page changes into EEPROM
 void eeprom_persist(void)
 {
     while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm)
@@ -296,7 +302,7 @@ int main(void)
             tap = 0;
         }
 
-        // MOD: handle delayed `tap` reset in EEPROM due to power-off pot value changes
+        // MOD: handle delayed `tap` reset in EEPROM due to potentional power-off Pot value changes
         if (eeprom_reset_tap == 1)
         {
             // check if tap still 0
@@ -320,106 +326,107 @@ int main(void)
         // MOD: added this variable to shorten main loop processing time, all tests of it later use `==` now
         currentstate = debounce();
 
-        // TAP TEMPO
-
-        if (nbtap > 1 && currentstate == 0 && laststate == 0) // if too long between taps, persist values and resets tapping process
+        // TAP button handling
+        if (currentstate == 0 && laststate == 0) // Tap button keeps off
         {
-            if (ms > (3 * mstempo))
+            if (nbtap > 1) // if too long between taps, persist values and resets tapping process
             {
-                // write changed values into EEPROM
-                *(uint8_t *)(EEPROM_TAP) = 1;
-                *(uint16_t *)(EEPROM_TEMPO) = mstempo;
-                eeprom_persist();
+                if (ms > (3 * mstempo))
+                {
+                    // write changed values into EEPROM
+                    *(uint8_t *)(EEPROM_TAP) = 1;
+                    *(uint16_t *)(EEPROM_TEMPO) = mstempo;
+                    eeprom_persist();
 
-                // reset cycle
-                tap = 1;
+                    // reset cycle
+                    tap = 1;
+                    ms = 0;
+                    nbtap = 0;
+                    tapping = 0;
+                }
+            }
+            else if (nbtap == 1 && ms > (delaymax + 800)) // if tapped only once, reset once the max tempo + 800ms passed // MOD: delay based on max tempo only without div switch
+            {
                 ms = 0;
                 nbtap = 0;
                 tapping = 0;
             }
         }
-
-        if (nbtap == 1 && ms > (delaymax + 800) && currentstate == 0 && laststate == 0) // if tapped only once, reset once the max tempo + 800ms passed // MOD: delay based on max tempo only without div switch
-        {
-            ms = 0;
-            nbtap = 0;
-            tapping = 0;
-        }
-
-        if (currentstate == 0 && laststate == 1) // release tap button
+        else if (currentstate == 0 && laststate == 1) // Tap button just released
         {
             laststate = 0;
-            PORTA.OUTCLR = (1 << LED_PIN);
+            PORTA.OUTCLR = (1 << LED_PIN); // switch LED off
             previouspot = pot;
         }
-
-        if (currentstate == 1 && laststate == 0 && nbtap == 0) // first tap
+        else if (currentstate == 1 && laststate == 0) // Tap button just pressed
         {
-            TCA0.SINGLE.CNT = 0; // starts counting
-            ms = 0;
-            nbtap++;
-            laststate = 1;
-            tapping = 1;
-        }
-
-        if (currentstate == 1 && laststate == 0 && nbtap != 0 && ms >= 50) // not first tap // NOTE: seems here is another debouncing in `ms >` condition! // MOD: changed `ms >= 100` to `ms >= 50`
-        {
-            if (TCA0.SINGLE.CNT >= 500)
+            if (nbtap == 0) // first tap
             {
-                ms++;
-            } // round up value if timer counter more than 500us
-
-            if (nbtap == 1) // if second tap, tempo = time elapsed between the 2 button press // MOD: changed `nbtap == 1` to `nbtap == 2`
-            {
-                mstempo = ms;
-                divtempo = mstempo * divmult;
-                if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
-                {
-                    divtempo = delaymax;
-                }
-            }
-            else // if more than second tap, average every tap
-            {
-                mstempo = (mstempo + ms) / 2;
-                divtempo = (divtempo + (mstempo * divmult)) / 2;
-                if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
-                {
-                    divtempo = delaymax;
-                }
+                TCA0.SINGLE.CNT = 0; // starts counting
+                ms = 0;
+                nbtap++;
+                laststate = 1;
+                tapping = 1;
             }
 
-            // MOD: correct calculation of the `pwm`, it is not `divtempo` directly as `delaymax` may differ from pwm max value!
-            float r = (float)divtempo / (float)delaymax;
-            pwm = r * PWM_MAX;
+            if (nbtap != 0 && ms >= 50) // not first tap // NOTE: seems here is debouncing in `ms >` condition! // MOD: changed `ms >= 100` to `ms >= 50`
+            {
+                if (TCA0.SINGLE.CNT >= 500)
+                {
+                    ms++;
+                } // round up value if timer counter more than 500us
 
-            nbtap++; // updating number of tap and last state of tap button
-            laststate = 1;
-            TCA0.SINGLE.CNT = 0; // reseting counter and ms
-            ms = 0;
-            ledms = 0;
-            tap = 1; // now in tap control mode
-            PORTA.OUTSET = (1 << LED_PIN);
+                if (nbtap == 1) // if second tap, tempo = time elapsed between the 2 button press // MOD: changed `nbtap == 1` to `nbtap == 2`
+                {
+                    mstempo = ms;
+                    divtempo = mstempo * divmult;
+                    if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
+                    {
+                        divtempo = delaymax;
+                    }
+                }
+                else // if more than second tap, average every tap
+                {
+                    mstempo = (mstempo + ms) / 2;
+                    divtempo = (divtempo + (mstempo * divmult)) / 2;
+                    if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
+                    {
+                        divtempo = delaymax;
+                    }
+                }
+
+                // MOD: correct calculation of the `pwm`, it is not `divtempo` directly as `delaymax` may differ from pwm max value!
+                float r = (float)divtempo / (float)delaymax;
+                pwm = r * PWM_MAX;
+
+                nbtap++; // updating number of tap and last state of tap button
+                laststate = 1;
+                TCA0.SINGLE.CNT = 0; // reseting counter and ms
+                ms = 0;
+                ledms = 0;
+                tap = 1;                       // now in tap control mode
+                PORTA.OUTSET = (1 << LED_PIN); // swith LED on
+            }
         }
-
-        // RAMP // MOD: feature removed
-        //
-        // if (currentstate == 1 && ms >= 2000 && laststate == 1) // if button pressed more than 2s
-        // {
-        // TODO long tap may be used for another feature - enable/disable randow short rotation slowdown followed by speed up bac to tempo - from Rhett Shull video about tape delays
-        // }
+        else if (currentstate == 1 && laststate == 1) // Tap button keeps on
+        {
+            // RAMP // MOD: feature removed
+            // if (ms >= 2000) // if button pressed more than 2s
+            // {
+            // TODO long tap may be used for another feature - enable/disable randow short rotation slowdown followed by speed up bac to tempo - from Rhett Shull video about tape delays
+            // }
+        }
 
         // LED CONTROL
         if (tap != 1 && tapping == 0) // keep the light on when on Pot control
         {
             PORTA.OUTSET = (1 << LED_PIN);
         }
-
-        if (tapping == 1 && nbtap == 1 && laststate == 1) // keep the light off when long button press
+        else if (tapping == 1 && nbtap == 1 && laststate == 1) // keep the light off during long button press
         {
             PORTA.OUTCLR = (1 << LED_PIN);
         }
-
-        if (tap == 1 && tapping == 0 && currentstate == 0) // handle blinking in Tap mode and out of tapping process
+        else if (tap == 1 && tapping == 0 && currentstate == 0) // handle blinking in Tap mode and out of tapping process
         {
             if (ledms >= (mstempo - 4)) // turns LED on every downbeat
             {
