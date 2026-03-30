@@ -309,7 +309,7 @@ int main(void)
             if (tap == 0)
             {
                 //  check delay elapsed
-                if (ms > 500)
+                if (ms > 1000)
                 {
                     // write change to EEPROM
                     *(uint8_t *)(EEPROM_TAP) = 0;

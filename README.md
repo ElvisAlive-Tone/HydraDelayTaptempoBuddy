@@ -57,10 +57,10 @@ It is really easy:
 ## Project Content
 
 - **ToDo** `.hex` - firmware binary
-- **ToDo** `_geber.zip` - Gerber file for PCB fabrication
 - `firmware/` - VSCode/[PlatformIO](https://docs.platformio.org/en/latest/platforms/atmelmegaavr.html) project with firmware
-- `FV1BuddyForHydra.dch` - updated schematics
-- **ToDo** `.dip` - PCB design file
+- `FV1BuddyForHydra.dch` - schematics
+- `FV1BuddyForHydra-rev1_gerber.zip` - Gerber file for PCB fabrication
+- `FV1BuddyForHydra.dip` - PCB design file
 
 Schematics and PCB design file can be opened/edited by [DipTrace](https://diptrace.com/).
 
