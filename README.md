@@ -33,26 +33,50 @@ It is really easy:
   long enough wires for the placeent.
 - Do not solder `Speed` pot to the Hydra PCB, but connect its pads to the module instead:
   - right most square one to `GND` - ground for the module.
-  - center one to `VOUT` - tempo voltage from the module back to the Hydra.
-  - left one to `PWR` - 3,3V power for the module.
-- `Time Pot` - connect `Speed` pot to the module's `TPOT1`, `TPOT2` and `TPOT3`.
+  - center one to `O` - tempo voltage from the module back to the Hydra.
+  - left one to `3V3` - 3,3V power for the module.
+- `Time Pot` - connect `Speed` pot to the module's `P1`, `P2` and `P3`.
   Use `B` type pot, from `B10k` up to Hydra's original `B100k`.
   Use `Time` or `Speed` or `Delay` label for the pot as you prefer ;-)
-- `Tap Button` - connect momentary button to the module's `TBTN1` and `TBTN2`.
-- `LED` - connect LED to the module's `TLED+` and `TLED-`. Use `TR1` trimmer to set LED's brightness. Used 2k value should.
+- `Tap Button` - connect momentary button to the module's `TAP` and `T2`.
+- `LED` - connect LED to the module's `L+` and `L-`. Use `TL` trimmer to set LED's brightness. Used `2k` value should
   be OK for the most LED types, if too small for your LED, use higher trimmer value, or connect additional resistor.
-  in series.
-- `Tap to Head` switch - optional, single on/off or on/on switch, connect it to the module's `THSW1` and `THSW2`. Pads connected together is tapping to _Head 2_.
+  in series. Alternatively use fixed value resistor `RL`.
+- `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` and `D2`. Pads connected together is tapping to _Head 4_, disconnected is _Head 2_.
 
 **ToDo** Image How to connect taptempo module to Hydra PCB
 
 ## Building module
 
-**ToDo** schematics image
+Module schematics:
 
-**ToDo** BOM
+![Module schematics](img/schematics.png)
 
-**ToDo** PCB image
+PCB BOM:
+
+| Markings           | Value             | PCB packaging type           |
+| ------------------ | ----------------- | ---------------------------- |
+| R1, R2             | 1k                | 1206                         |
+| R4                 | 10k               | 1206                         |
+| C1, C3, C4         | 100n              | 1206                         |
+| C2                 | 10u               | 5,3mm                        |
+| TL                 | 2k                | ?                            |
+| RL (instead of TL) | matching LED      | 1206                         |
+| U1                 | ATtiny 402 or 412 | SOIC-8                       |
+| UPDI               |                   | 3 pins header male connector |
+
+External components:
+
+| Markings      | Value                  |
+| ------------- | ---------------------- |
+| `Time Pot`    | B10k - B100k           |
+| LED           | any color and size LED |
+| `Tap Button`  | any momentary switch   |
+| `Tap to Head` | any on/off switch      |
+
+PCB:
+
+![PCB](img/pcb.png)
 
 ## Project Content
 
@@ -94,4 +118,4 @@ All changes are marker by `MOD:` comment in the source code as accurate as possi
 
 ## License
 
-© 2025 ElvisAlive Tone. This work is openly licensed via [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+© 2025 - 2026 ElvisAlive Tone. This work is openly licensed via [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
