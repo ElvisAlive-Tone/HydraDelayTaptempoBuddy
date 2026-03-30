@@ -6,7 +6,7 @@ for use with [Hydra multi-head Delay by PedalPCB](https://www.pedalpcb.com/produ
 
 **NOTE:** this project is not fully finished yet. Firmware generally works, but
 is under testing still. One additional feature is in my head also.
-HW part is also under testing, schematic will be updated once HW is finished and PCB designed then.
+HW part is also under testing, schematic will be updated once HW is finished and PCB designed.
 
 **Tip:** You can use my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) for tis project.
 
@@ -23,7 +23,7 @@ HW part is also under testing, schematic will be updated once HW is finished and
   - selects if tapped tempo targets _Head 2_ or _Head 4_. Tapping
     to _Head 2_ allows you easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
   - switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
-- current `Time Pot` or `Tap Button` controll mode, together with the tapped tempo, is persisted over pedal power-off.
+- current `Time Pot` or `Tap Button` controll mode, together with the tapped tempo, is preserved over the pedal power-off.
 
 ## Applying module into Hydra effect
 
@@ -35,14 +35,14 @@ It is really easy:
   - right most square one to `GND` - ground for the module.
   - center one to `O` - tempo voltage from the module back to the Hydra.
   - left one to `3V3` - 3,3V power for the module.
-- `Time Pot` - connect `Speed` pot to the module's `P1`, `P2` and `P3`.
+- `Time Pot` - connect `Speed` pot 1, 2 and 3 lugs to the module's `P1`, `P2` and `P3`.
   Use `B` type pot, from `B10k` up to Hydra's original `B100k`.
   Use `Time` or `Speed` or `Delay` label for the pot as you prefer ;-)
-- `Tap Button` - connect momentary button to the module's `TAP` and `T2`.
+- `Tap Button` - connect momentary button to the module's `TAP` pads.
 - `LED` - connect LED to the module's `L+` and `L-`. Use `TL` trimmer to set LED's brightness. Used `2k` value should
   be OK for the most LED types, if too small for your LED, use higher trimmer value, or connect additional resistor.
   in series. Alternatively use fixed value resistor `RL`.
-- `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` and `D2`. Pads connected together is tapping to _Head 4_, disconnected is _Head 2_.
+- `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` pads. Pads connected together is tapping to _Head 4_, disconnected is _Head 2_.
 
 **ToDo** Image How to connect taptempo module to Hydra PCB
 
@@ -54,16 +54,16 @@ Module schematics:
 
 PCB BOM:
 
-| Markings           | Value             | PCB packaging type           |
-| ------------------ | ----------------- | ---------------------------- |
-| R1, R2             | 1k                | 1206                         |
-| R4                 | 10k               | 1206                         |
-| C1, C3, C4         | 100n              | 1206                         |
-| C2                 | 10u               | 5,3mm                        |
-| TL                 | 2k                | ?                            |
-| RL (instead of TL) | matching LED      | 1206                         |
-| U1                 | ATtiny 402 or 412 | SOIC-8                       |
-| UPDI               |                   | 3 pins header male connector |
+| Markings           | Value             | PCB packaging type                                    |
+| ------------------ | ----------------- | ----------------------------------------------------- |
+| R1, R2             | 1k                | 1206                                                  |
+| R4                 | 10k               | 1206                                                  |
+| C1, C3, C4         | 100n              | 1206                                                  |
+| C2                 | 10u               | 5,3mm                                                 |
+| TL                 | 2k                | sorry, from my stash, no idea about the type          |
+| RL (instead of TL) | matching LED      | 1206                                                  |
+| U1                 | ATtiny 402 or 412 | SOIC-8                                                |
+| UPDI               |                   | 3 pins header connector (male or female, it's on you) |
 
 External components:
 
@@ -96,7 +96,7 @@ Functional changes:
 
 - Hydra maximum delay time is used by default (no callibration necessary)
 - "Tempo Division Switch" allows to select taping for "Head 2" or "Head 4" of the pedal.
-  It is read as a binary input and is fully optional - defaults to "Head 4" if omitted.
+  It is read as a binary input and is fully optional - defaults to "Head 2" if omitted.
 - "48kHz Clock Output" and related functionality is removed
 - long Tap initiated 'RAMP' feature removed
 
@@ -105,12 +105,13 @@ Non-functional changes:
 - "Momentary Tap Tempo Button Input" moved to microcontroller's pin freed by remove
   of "48kHz Clock Output". So UPDI pin is not used and "UPDI High-Voltage
   Activation" capable programmer is not necessary. You can use
-  my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb).
+  my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) and
+  program u-controller on the board using `UPDI` header pins.
 - Added hardware debounce circuit for the Tap Tempo button.
 - Corrected computiong of the `pwm` value when Tab button is used.
 - EEPROM storing code chaged, `avr/eeprom'h` haven't work for me (but it might be due to next problem found later ;-).
 - Implemented delayed `tap=0` storing into EEPROM to keep `tap=1` during power-off, as
-  `Time Pot` value change may be detected by uC as power voltage drops.
+  `Time Pot` value change may be detected by u-controller as power voltage drops.
 - Distinct code optimizatios.
 - Lots of comments added as I learnt the code.
 
