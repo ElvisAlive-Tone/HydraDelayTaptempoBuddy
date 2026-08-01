@@ -4,9 +4,10 @@ This is adaptation of [FV1Buddy tap tempo module](https://github.com/ElectricCan
 for use with [Hydra multi-head Delay by PedalPCB](https://www.pedalpcb.com/product/pcb238/)
 (also available as a [kit at musikding.de](https://www.musikding.de/Hydra-Delay-kit)).
 
-**NOTE:** this project is not fully finished yet. Firmware generally works, but
-is under testing still. One additional feature is in my head also.
-HW part is also under testing, schematic will be updated once HW is finished and PCB designed.
+**NOTE:** this project is not fully finished yet, but we are close.
+Firmware is functionally finished, but is under testing still.
+HW part is also under testing on breadboard. I have PCBs manufactured, hope to assemble it and test on it soon.
+I plan to recalibrate PWM on real HW, as breadboard is clunky a bit.
 
 **Tip:** You can use my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) for tis project.
 
@@ -17,16 +18,16 @@ HW part is also under testing, schematic will be updated once HW is finished and
   - Second tap must follow under 1,7s after first one.
   - Subsequent tap times are averaged until tapping finishes.
   - Tapping finishes if next tap is not performed for at least 3 times of the currently
-    tapped tempo - `LED` blinks in the tapped tempo then.
-  - Tapped in tempo is restricted to Hydra delay time boundarties.
-- Move `Speed Pot` at least 5% to switch controll back to it - `LED` is on without blinking then
+    tapped in tempo - `LED` blinks in the tapped tempo then on 50% duty cycle.
+  - Tapped in tempo is restricted to Hydra delay time boundarties while tapping it in.
+- Move `Speed Pot` at least 5% to switch controll back to it - `LED` is on without blinking then.
 - `Tap to Head switch` (optional)
-  - Selects if tapped tempo targets _Head 2_ or _Head 4_. **Tip:** Tapping
-    to _Head 2_ allows you easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
+  - Selects if tapped in tempo targets _Head 2_ or _Head 4_. **Tip:** Tapping
+    to _Head 2_ allows you to easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
   - Switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
 - Current `Speed Pot` or `Tap Button` controll state, together with the tapped in tempo, is preserved over the pedal power-off.
-- Long tap: Ramp function slowly speeding down and up through the whole delay time range until button is released. Ramping speed depends on `Speed Pot`.
-  - Idea for another feature: Long tap enables/disables randow short Speed slowdown then Speed up back to the tapped in tempo - idea from Rhett Shull video about tape delays
+- Long tap (over 2s) launches ramp function, ramping down and up through the whole delay time range, until button is released. Ramping speed depends on `Speed Pot`. Original speed is back after the release.
+  - Idea for another feature: Long tap enables/disables randow short Speed slowdown followed by Speed up back to the tapped in/pot tempo - idea from Rhett Shull video about tape delays
 
 ## Applying module into Hydra effect
 

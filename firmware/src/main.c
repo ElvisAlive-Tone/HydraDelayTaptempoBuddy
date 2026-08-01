@@ -51,7 +51,8 @@
 #define LED_PIN 7
 #define POT_PIN 1 // higher voltage higher Speed -> shorter delay!
 #define DIV_PIN 2
-#define DEBOUNCE_TIME 900 // Tap tempo button debounce time [us]
+#define DEBOUNCE_TIME 900   // Tap tempo button debounce time [us]
+#define POT_MAX_VALUE 0x3FF // 10bit ADC max value to convert pot
 
 // MOD: changed EEPROM addresses to point into EEPROM
 const uint16_t EEPROM_TAP = 0x1400;   // one byte to store `tap` variable
@@ -222,6 +223,12 @@ void eeprom_persist(void)
     sei();
 }
 
+// MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant, extracted to method for reuse
+uint16_t pot_to_pwm(uint16_t pot)
+{
+    return pot * (POT_MAX_VALUE / c_delay_range);
+}
+
 // MOD: compute correct PWM value from `divtempo` [ms] and Hydra measured dealay time range constants.
 // PWM must be opposite to tempo, as higher PWM is higher Speed -> shorter delay!
 uint16_t divtempo_to_pwm(uint16_t divtempo)
@@ -322,8 +329,8 @@ int main(void)
         // if pot move of more than 5%, changing to pot control // MOD: 5% instead of 7%
         if ((tap == 1 && tapping == 0 && abs(previouspot - pot) >= 50) || (tap == 0 && tapping == 0 && abs(previouspot - pot) >= 10)) // MOD: min pot move must be higher than 1 to debounce it a bit, 10 represents 1% of pot change
         {
-            // MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant
-            pwm = pot * (0x3FF / c_delay_range);
+            // MOD: function defined
+            pwm = pot_to_pwm(pot);
             previouspot = pot;
             // MOD: delay EEPROM change due to power-off pot value changes
             if (tap == 1)
@@ -442,9 +449,9 @@ int main(void)
         }
         else if (currentstate == 1 && laststate == 1) // Tap button keeps on
         {
-            // RAMP
             if (ms >= 2000) // if button pressed more than 2s
             {
+                // Ramp feature - gradually increase/decrease delay time across whole range while button pressed, fluctuation speed depends on `pot` value
                 while (debounce())
                 {
                     if (updown == 0)
@@ -467,7 +474,9 @@ int main(void)
                         PORTA.OUTTGL = (1 << LED_PIN);
                     }
 
-                    for (uint16_t i = 0; i < pot; i++)
+                    // MOD: pot interpretation corrected as it is marked as Speed, so higher value must be faster ramping
+                    // MOD: ramping slowed down by that multiplier and addition constant. It is then multiplied by c_delay_range (cca 700) so we are at about 7,5ms ... 2s ramping half-cycle.
+                    for (uint16_t i = 0; i < (((POT_MAX_VALUE - pot) * 2) + 10); i++)
                     {
                         _delay_us(1);
                     }
@@ -480,8 +489,8 @@ int main(void)
                 }
                 else
                 {
-                    // MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant
-                    pwm = pot * (0x3FF / c_delay_range);
+                    // MOD: function defined
+                    pwm = pot_to_pwm(pot);
                 }
                 updown = 0;
                 previouspot = pot;
@@ -493,11 +502,11 @@ int main(void)
         {
             PORTA.OUTSET = (1 << LED_PIN);
         }
-        else if (tapping == 1 && nbtap == 1 && laststate == 1) // keep the light off during long button press
+        else if (tapping == 1 && nbtap == 1 && laststate == 1) // keep the light off during long button press waiting, until handler starts to act
         {
             PORTA.OUTCLR = (1 << LED_PIN);
         }
-        else if (tap == 1 && tapping == 0 && currentstate == 0) // handle blinking in Tap mode and out of tapping process
+        else if (tap == 1 && tapping == 0 && currentstate == 0) // handle blinking in Tap mode out of the tapping process
         {
             if (ledms >= (mstempo - 4)) // turns LED on every downbeat
             {
@@ -505,7 +514,7 @@ int main(void)
                 PORTA.OUTSET = (1 << LED_PIN);
             }
 
-            if (ledms >= (mstempo / 2)) // MOD: turns LED off at the half of cycle
+            if (ledms >= (mstempo / 2)) // MOD: turns LED off at the 50% duty cycle
             {
                 PORTA.OUTCLR = (1 << LED_PIN);
             }
