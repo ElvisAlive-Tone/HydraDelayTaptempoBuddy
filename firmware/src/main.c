@@ -46,17 +46,22 @@
 #include <stdlib.h>
 
 // MOD: `#define CLK_PIN 6` removed
-#define PWM_PIN 3
+#define PWM_PIN 3 // max voltage is shortest delay (max Speed)!
 #define TAP_PIN 6 // MOD: changed from 0 to 6 so we do not need to reconfigure UPDI pin
 #define LED_PIN 7
-#define POT_PIN 1
+#define POT_PIN 1 // higher voltage higher Speed -> shorter delay!
 #define DIV_PIN 2
 #define DEBOUNCE_TIME 900 // Tap tempo button debounce time [us]
-#define PWM_MAX 999       // MOD: max `pwm` value stored in constant
 
 // MOD: changed EEPROM addresses to point into EEPROM
 const uint16_t EEPROM_TAP = 0x1400;   // one byte to store `tap` variable
 const uint16_t EEPROM_TEMPO = 0x1401; // two bytes to store `mstempo` variable
+
+// MOD: constants for `pwm` value computation from `divtempo`
+const uint16_t c_pwm_max = 999;
+const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - on pwm=0 in ISR method
+const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - on pwm=c_pwm_max in ISR method
+const uint16_t c_delay_range = 702; // Computed as `c_delay_max` - `c_delay_min` [ms]
 
 // MOD: store firmware revision info into uC binary code for further reference.
 // Must be volatile to be kept by compiler.
@@ -132,7 +137,7 @@ void TCA_Config(void)
     // Enable PWM output 0 (PA3), single slope PWM
     TCA0.SINGLE.CTRLB |= TCA_SINGLE_WGMODE_SINGLESLOPE_gc | TCA_SINGLE_CMP0EN_bm;
     // Set period to 1000 (20kHz for 20MHz clock)
-    TCA0.SINGLE.PER = PWM_MAX;
+    TCA0.SINGLE.PER = c_pwm_max;
     // set initial ratio to 50%
     TCA0.SINGLE.CMP0 = 500;
     // Enable overflow interrupt
@@ -146,6 +151,7 @@ ISR(TCA0_OVF_vect)
 {
     // set pwm output value
     TCA0.SINGLE.CMP0BUF = pwm;
+    // TCA0.SINGLE.CMP0BUF = 800; // use constant value here for calibration, curve seem to be linear, so use 0 and c_pwm_max and then set three delay related c_ accotdingly
 
     // count ms
     static uint8_t count;
@@ -216,6 +222,30 @@ void eeprom_persist(void)
     sei();
 }
 
+// MOD: compute correct PWM value from `divtempo` [ms] and Hydra measured dealay time range constants.
+// PWM must be opposite to tempo, as higher PWM is higher Speed -> shorter delay!
+uint16_t divtempo_to_pwm(uint16_t divtempo)
+{
+    return (uint16_t)(((uint32_t)(c_delay_max - divtempo) * c_pwm_max) / c_delay_range);
+}
+
+// MOD: check `divtempo` value is in range of [c_delay_min, c_delay_max] and correct it if not
+uint16_t divtempo_range(uint16_t divtempo)
+{
+    if (divtempo > c_delay_max)
+    {
+        return c_delay_max;
+    }
+    else if (divtempo < c_delay_min)
+    {
+        return c_delay_min;
+    }
+    else
+    {
+        return divtempo;
+    }
+}
+
 int main(void)
 {
     // Unlocking protected registers and setting main clock to 20MHz
@@ -228,18 +258,18 @@ int main(void)
     uint8_t laststate = 0;        // Laststate of Tap button
     uint8_t nbtap = 0;            // Number of subsequent taps during current tapping
     uint8_t tapping = 0;          // Tapping currently in progress (1) or not (0)
-    uint16_t divtempo = 500;      // Current tempo in ms multiplied by divmult
-    uint16_t previouspot;         // Previous Time Pot value to be able to detect chnge 0-1024
-    uint16_t delaymax = 900;      // Maximum allowed delay [ms] // MOD: no callibration
+    uint16_t divtempo = 500;      // Current delay time in [ms] - computed from `mstempo` and `divmult` switch state
+    uint16_t previouspot;         // Previous Time Pot value to be able to detect change 0-1024
     uint8_t eeprom_reset_tap = 0; // Flag for delayed `tap` reset in EEPROM
+    uint8_t updown = 0;           // direction for Ramp feature
 
     // MOD: read values from EEPROM
     while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm) // Wait for EEPROM not busy.
         ;
-    uint8_t tap = *(uint8_t *)(EEPROM_TAP);         // 1 for tap tempo, 0 for pot control
-    uint16_t mstempo = *(uint16_t *)(EEPROM_TEMPO); // Current tempo in ms
+    uint8_t tap = *(uint8_t *)(EEPROM_TAP);         // Current control status - 1 for tap tempo, 0 for pot control
+    uint16_t mstempo = *(uint16_t *)(EEPROM_TEMPO); // Currently tapped in tempo in ms
     // MOD: check values from EEPROM and patch them just in case
-    if (mstempo < 10 || mstempo > delaymax)
+    if (mstempo < 10 || mstempo > c_delay_max)
     {
         mstempo = 500;
     }
@@ -257,27 +287,30 @@ int main(void)
     // wait for ADC etc
     _delay_ms(500);
 
+    // Initialize from values stored in EEPROM
     uint8_t divmult = divmult_from_diwsw(); // MOD: read multiplier for tempo based on Div switch state
     if (tap == 1)
     {
         previouspot = pot;
-        // MOD: compute current divtempo and pwm
-        divtempo = mstempo * divmult;
-        pwm = divtempo;
+        // MOD: compute current divtempo
+        divtempo = divtempo_range(mstempo * divmult);
+        // MOD: correct calculation of the PWM
+        pwm = divtempo_to_pwm(divtempo);
 
-        // TODO remove
-        blink();
-        blink();
+        // uncomment for debug
+        // blink();
+        // blink();
     }
     else
     {
         // set high value so code in main loop kicks-in and set real value
         previouspot = 60000;
-        // TODO remove
-        blink();
+
+        // uncomment for debug
+        // blink();
     }
 
-    // main loop
+    // Main loop
     while (1)
     {
 
@@ -289,7 +322,8 @@ int main(void)
         // if pot move of more than 5%, changing to pot control // MOD: 5% instead of 7%
         if ((tap == 1 && tapping == 0 && abs(previouspot - pot) >= 50) || (tap == 0 && tapping == 0 && abs(previouspot - pot) >= 10)) // MOD: min pot move must be higher than 1 to debounce it a bit, 10 represents 1% of pot change
         {
-            pwm = pot * (0x3FF / delaymax);
+            // MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant
+            pwm = pot * (0x3FF / c_delay_range);
             previouspot = pot;
             // MOD: delay EEPROM change due to power-off pot value changes
             if (tap == 1)
@@ -345,7 +379,7 @@ int main(void)
                     tapping = 0;
                 }
             }
-            else if (nbtap == 1 && ms > (delaymax + 800)) // if tapped only once, reset once the max tempo + 800ms passed // MOD: delay based on max tempo only without div switch
+            else if (nbtap == 1 && ms > (c_delay_max + 800)) // if tapped only once, reset once the max tempo + 800ms passed // MOD: delay based on max tempo only without div switch
             {
                 ms = 0;
                 nbtap = 0;
@@ -380,24 +414,22 @@ int main(void)
                 {
                     mstempo = ms;
                     divtempo = mstempo * divmult;
-                    if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
-                    {
-                        divtempo = delaymax;
-                    }
                 }
                 else // if more than second tap, average every tap
                 {
                     mstempo = (mstempo + ms) / 2;
                     divtempo = (divtempo + (mstempo * divmult)) / 2;
-                    if (divtempo > delaymax) // MOD: added too long delay prevention due to head 2 taping
-                    {
-                        divtempo = delaymax;
-                    }
                 }
 
-                // MOD: correct calculation of the `pwm`, it is not `divtempo` directly as `delaymax` may differ from pwm max value!
-                float r = (float)divtempo / (float)delaymax;
-                pwm = r * PWM_MAX;
+                // MOD: keep `divtempo` boundaries, correct `mstempo` to matches boundaries
+                divtempo = divtempo_range(divtempo);
+                if (divtempo == c_delay_min || divtempo == c_delay_max)
+                {
+                    mstempo = divtempo / divmult;
+                }
+
+                // MOD: correct calculation of the `pwm`
+                pwm = divtempo_to_pwm(divtempo);
 
                 nbtap++; // updating number of tap and last state of tap button
                 laststate = 1;
@@ -410,11 +442,50 @@ int main(void)
         }
         else if (currentstate == 1 && laststate == 1) // Tap button keeps on
         {
-            // RAMP // MOD: feature removed
-            // if (ms >= 2000) // if button pressed more than 2s
-            // {
-            // TODO long tap may be used for another feature - enable/disable randow short rotation slowdown followed by speed up bac to tempo - from Rhett Shull video about tape delays
-            // }
+            // RAMP
+            if (ms >= 2000) // if button pressed more than 2s
+            {
+                while (debounce())
+                {
+                    if (updown == 0)
+                    {
+                        divtempo += 1;
+                    }
+
+                    else
+                    {
+                        divtempo -= 1;
+                    }
+
+                    // MOD: correct calculation of the `pwm` value from `divtempo`
+                    pwm = divtempo_to_pwm(divtempo);
+
+                    // MOD: correct boundaries used
+                    if (divtempo == c_delay_min || divtempo == c_delay_max)
+                    {
+                        updown ^= 1;
+                        PORTA.OUTTGL = (1 << LED_PIN);
+                    }
+
+                    for (uint16_t i = 0; i < pot; i++)
+                    {
+                        _delay_us(1);
+                    }
+                }
+                if (tap == 1)
+                {
+                    divtempo = mstempo * divmult;
+                    // MOD: correct calculation of the `pwm`
+                    pwm = divtempo_to_pwm(divtempo);
+                }
+                else
+                {
+                    // MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant
+                    pwm = pot * (0x3FF / c_delay_range);
+                }
+                updown = 0;
+                previouspot = pot;
+            }
         }
 
         // LED CONTROL
@@ -434,7 +505,7 @@ int main(void)
                 PORTA.OUTSET = (1 << LED_PIN);
             }
 
-            if (ledms >= 8) // turns LED off 8ms after downbeat
+            if (ledms >= (mstempo / 2)) // MOD: turns LED off at the half of cycle
             {
                 PORTA.OUTCLR = (1 << LED_PIN);
             }

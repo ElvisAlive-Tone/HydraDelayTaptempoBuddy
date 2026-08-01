@@ -12,18 +12,21 @@ HW part is also under testing, schematic will be updated once HW is finished and
 
 ## Features
 
-- Delay time/tempo can be controlled by `Time Pot` or tapped by `Tap Button`.
-- Tap `Tap Button` at least two times to switch from `Time Pot` controll to `Tap Button` conntroll.
+- Delay time/tempo can be controlled by `Speed Pot` or tapped by `Tap Button`.
+- Tap `Tap Button` at least two times to switch from `Speed Pot` controll to `Tap Button` conntroll.
   - Second tap must follow under 1,7s after first one.
   - Subsequent tap times are averaged until tapping finishes.
   - Tapping finishes if next tap is not performed for at least 3 times of the currently
-    tapped tempo - `LED` blinks in the tapped tempo then
-- Move `Time Pot` at least 5% to switch controll back to it - `LED` is on without blinking then
+    tapped tempo - `LED` blinks in the tapped tempo then.
+  - Tapped in tempo is restricted to Hydra delay time boundarties.
+- Move `Speed Pot` at least 5% to switch controll back to it - `LED` is on without blinking then
 - `Tap to Head switch` (optional)
-  - selects if tapped tempo targets _Head 2_ or _Head 4_. Tapping
+  - Selects if tapped tempo targets _Head 2_ or _Head 4_. **Tip:** Tapping
     to _Head 2_ allows you easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
-  - switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
-- current `Time Pot` or `Tap Button` controll mode, together with the tapped tempo, is preserved over the pedal power-off.
+  - Switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
+- Current `Speed Pot` or `Tap Button` controll state, together with the tapped in tempo, is preserved over the pedal power-off.
+- Long tap: Ramp function slowly speeding down and up through the whole delay time range until button is released. Ramping speed depends on `Speed Pot`.
+  - Idea for another feature: Long tap enables/disables randow short Speed slowdown then Speed up back to the tapped in tempo - idea from Rhett Shull video about tape delays
 
 ## Applying module into Hydra effect
 
@@ -32,17 +35,17 @@ It is really easy:
 - Plan tap tempo module and all new controls placement in the pedal enclosure. Use
   long enough wires for the placeent.
 - Do not solder `Speed` pot to the Hydra PCB, but connect its pads to the module instead:
-  - right most square one to `GND` - ground for the module.
+  - closest to the PCB edge square one to `GND` - ground for the module.
   - center one to `O` - tempo voltage from the module back to the Hydra.
-  - left one to `3V3` - 3,3V power for the module.
-- `Time Pot` - connect `Speed` pot 1, 2 and 3 lugs to the module's `P1`, `P2` and `P3`.
+  - third one to `3V3` - 3,3V power for the module.
+- `Speed` pot - connect pot's 1, 2 and 3 lugs to the module's `P1`, `P2` and `P3`.
   Use `B` type pot, from `B10k` up to Hydra's original `B100k`.
-  Use `Time` or `Speed` or `Delay` label for the pot as you prefer ;-)
 - `Tap Button` - connect momentary button to the module's `TAP` pads.
 - `LED` - connect LED to the module's `L+` and `L-`. Use `TL` trimmer to set LED's brightness. Used `2k` value should
   be OK for the most LED types, if too small for your LED, use higher trimmer value, or connect additional resistor.
-  in series. Alternatively use fixed value resistor `RL`.
-- `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` pads. Pads connected together is tapping to _Head 4_, disconnected is _Head 2_.
+  in series. Alternatively use fixed value resistor `RL` if you figured out exact value and wanna to save some space.
+- `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` pads. Pads
+  connected together is tapping to _Head 4_, disconnected is _Head 2_.
 
 **ToDo** Image How to connect taptempo module to Hydra PCB
 
@@ -69,7 +72,7 @@ External components:
 
 | Markings      | Value                  |
 | ------------- | ---------------------- |
-| `Time Pot`    | B10k - B100k           |
+| `Speed Pot`   | B10k - B100k           |
 | LED           | any color and size LED |
 | `Tap Button`  | any momentary switch   |
 | `Tap to Head` | any on/off switch      |
@@ -77,6 +80,28 @@ External components:
 PCB:
 
 ![PCB](img/pcb.png)
+
+## PWM calibration
+
+Source code contains constants for PWM calibration to Hydra delay time range.
+Used values were obtained from my Hydra and `C2=10u`, I'm not sure how much they can fluctuate for other builds.
+
+```c
+const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - on pwm=0 in ISR() method
+const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - on pwm=c_pwm_max in ISR() method
+const uint16_t c_delay_range = 702; // Computed as `c_delay_max` - `c_delay_min` [ms]
+```
+
+Constants are used in `divtempo_to_pwm()` method.
+
+If you have to recalibrate, set `pwm` in `ISR()` method to values mentioned in the comment, upload to u-controller, measure delay time, and change
+these constants. Characteristics is linear so end values are enough.
+At the end of the process, do not forget to return `ISR()` method to use `pwm` variable and upload valid firmware to u-controller ;-)
+
+I measured delay time using Ramp signal 100mV at 0.5Hz.
+Hydra must be on _Head 4_ only, Mix pot fully on the wet side to produce just delayed signal.
+Two osciloscoppe channels hooked to Hydra In and Out, run manually triggered scan at `1s` Horizontal to get traces, then stop it.
+Then switch Horizontal to `100ms` or `50ms` and measureed subsequent In and Out edge distances.
 
 ## Project Content
 
@@ -94,11 +119,10 @@ Schematics and PCB design file can be opened/edited by [DipTrace](https://diptra
 
 Functional changes:
 
-- Hydra maximum delay time is used by default (no callibration necessary)
+- PWM calibration to Hydra delay range is hardcoded (no callibration by tap button, you have to rebuild firmware)
 - "Tempo Division Switch" allows to select taping for "Head 2" or "Head 4" of the pedal.
   It is read as a binary input and is fully optional - defaults to "Head 2" if omitted.
 - "48kHz Clock Output" and related functionality is removed
-- long Tap initiated 'RAMP' feature removed
 
 Non-functional changes:
 
@@ -108,14 +132,15 @@ Non-functional changes:
   my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) and
   program u-controller on the board using `UPDI` header pins.
 - Added hardware debounce circuit for the Tap Tempo button.
-- Corrected computiong of the `pwm` value when Tab button is used.
+- Corrected computiong of the `pwm` value when Tab button is used, it was completely opposite as lower `pwm` value is longeer delay (Hydra pot is "Speed", not "Delay time").
 - EEPROM storing code chaged, `avr/eeprom'h` haven't work for me (but it might be due to next problem found later ;-).
+- LED now blinks with 50% tapped in time duty cycle (was on for constant 8ms in the original code).
 - Implemented delayed `tap=0` storing into EEPROM to keep `tap=1` during power-off, as
-  `Time Pot` value change may be detected by u-controller as power voltage drops.
+  `Speed Pot` value change may be detected by u-controller as power voltage drops.
 - Distinct code optimizatios.
 - Lots of comments added as I learnt the code.
 
-All changes are marker by `MOD:` comment in the source code as accurate as possible.
+All changes are marker by `MOD:` comment in the source code as accurately as possible.
 
 ## License
 
