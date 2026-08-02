@@ -472,8 +472,9 @@ int main(void)
                     }
 
                     // MOD: pot interpretation corrected as it is marked as Speed, so higher value must be faster ramping
-                    // MOD: ramping slowed down by that multiplier and addition constant. It is then multiplied by c_delay_range (cca 700) so we are at about 7,5ms ... 2s ramping half-cycle.
-                    for (uint16_t i = 0; i < (((POT_MAX_VALUE - pot) * 2) + 10); i++)
+                    // MOD: ramping slowed down by multiplier constant scaling that pot value, debounce() 900us and code execution time is also added to each step time.
+                    // It is then multiplied by c_delay_range (cca 700) in each direction. So we are at about 1,5s to 5s full ramping period, depending on `pot` value.
+                    for (uint16_t i = 0; i < ((POT_MAX_VALUE - pot) * 2); i++)
                     {
                         _delay_us(1);
                     }

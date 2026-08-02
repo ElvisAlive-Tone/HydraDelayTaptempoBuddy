@@ -9,7 +9,7 @@ Firmware is functionally finished, but is under testing still.
 HW part is also under testing on breadboard. I have PCBs manufactured, hope to assemble it and test on it soon.
 I plan to recalibrate PWM on real HW, as breadboard is clunky a bit.
 
-**Tip:** You can use my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) for tis project.
+**Tip:** You can use my [Simple Serial UPDI programmer](https://github.com/ElvisAlive-Tone/updipcb) to program u-controller for this project.
 
 ## Features
 
@@ -21,7 +21,7 @@ I plan to recalibrate PWM on real HW, as breadboard is clunky a bit.
     tapped in tempo - `LED` blinks in the tapped tempo then with 50% duty cycle.
   - Tapped in tempo is restricted to Hydra delay time boundarties while tapping it in.
 - Long tap on `Tap Button` (over 1.5s) launches ramping down and up through the whole delay time range, until button is released.
-  - Ramping velocity depends on `Speed Pot` (cca 1s to 6s per cycle). `LED` blinks as ramping switches direction to indicate this velocity.
+  - Ramping velocity depends on `Speed Pot` (cca 1.5s to 5s ramping cycle). `LED` blinks as ramping switches direction to indicate this velocity.
   - Original delay time is restored after the button release.
 - Move `Speed Pot` at least 5% to switch control back to it - `LED` is on without blinking then.
 - `Tap to Head switch` (optional)
@@ -145,4 +145,4 @@ All changes are marker by `MOD:` comment in the source code as accurately as pos
 
 ## License
 
-© 2025 - 2026 ElvisAlive Tone. This work is openly licensed via [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+© 2025 - 2026 ElvisAlive Tone. This work is openly licensed via [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/)
