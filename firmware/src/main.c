@@ -60,8 +60,8 @@ const uint16_t EEPROM_TEMPO = 0x1401; // two bytes to store `mstempo` variable
 
 // MOD: constants for `pwm` value computation from `divtempo`
 const uint16_t c_pwm_max = 999;
-const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - on pwm=0 in ISR method
-const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - on pwm=c_pwm_max in ISR method
+const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - Speed pot on minimum
+const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - Speed pot on maximum
 const uint16_t c_delay_range = 702; // Computed as `c_delay_max` - `c_delay_min` [ms]
 
 // MOD: store firmware revision info into uC binary code for further reference.
@@ -152,7 +152,6 @@ ISR(TCA0_OVF_vect)
 {
     // set pwm output value
     TCA0.SINGLE.CMP0BUF = pwm;
-    // TCA0.SINGLE.CMP0BUF = 800; // use constant value here for calibration, curve seem to be linear, so use 0 and c_pwm_max and then set three delay related c_ accotdingly
 
     // count ms
     static uint8_t count;
@@ -276,7 +275,7 @@ int main(void)
     uint8_t tap = *(uint8_t *)(EEPROM_TAP);         // Current control status - 1 for tap tempo, 0 for pot control
     uint16_t mstempo = *(uint16_t *)(EEPROM_TEMPO); // Currently tapped in tempo in ms
     // MOD: check values from EEPROM and patch them just in case
-    if (mstempo < 10 || mstempo > c_delay_max)
+    if (mstempo < c_delay_min || mstempo > c_delay_max)
     {
         mstempo = 500;
     }
@@ -299,22 +298,20 @@ int main(void)
     if (tap == 1)
     {
         previouspot = pot;
-        // MOD: compute current divtempo
+        // MOD: compute current divtempo, patch mstempo if necessary
         divtempo = divtempo_range(mstempo * divmult);
+        if (divtempo == c_delay_min || divtempo == c_delay_max)
+        {
+            mstempo = divtempo / divmult;
+        }
+
         // MOD: correct calculation of the PWM
         pwm = divtempo_to_pwm(divtempo);
-
-        // uncomment for debug
-        // blink();
-        // blink();
     }
     else
     {
         // set high value so code in main loop kicks-in and set real value
         previouspot = 60000;
-
-        // uncomment for debug
-        // blink();
     }
 
     // Main loop
@@ -379,14 +376,14 @@ int main(void)
                     *(uint16_t *)(EEPROM_TEMPO) = mstempo;
                     eeprom_persist();
 
-                    // reset cycle
+                    // reset state machine
                     tap = 1;
                     ms = 0;
                     nbtap = 0;
                     tapping = 0;
                 }
             }
-            else if (nbtap == 1 && ms > (c_delay_max + 800)) // if tapped only once, reset once the max tempo + 800ms passed // MOD: delay based on max tempo only without div switch
+            else if (nbtap == 1 && ms > 1500) // if tapped only once and timeout, reset state machine // MOD: timeout time set to constant 1.5s which is cca 2x max delay time
             {
                 ms = 0;
                 nbtap = 0;
@@ -449,7 +446,7 @@ int main(void)
         }
         else if (currentstate == 1 && laststate == 1) // Tap button keeps on
         {
-            if (ms >= 2000) // if button pressed more than 2s
+            if (ms >= 1500) // if button pressed more than 1.5s
             {
                 // Ramp feature - gradually increase/decrease delay time across whole range while button pressed, fluctuation speed depends on `pot` value
                 while (debounce())

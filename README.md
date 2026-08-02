@@ -14,27 +14,30 @@ I plan to recalibrate PWM on real HW, as breadboard is clunky a bit.
 ## Features
 
 - Delay time/tempo can be controlled by `Speed Pot` or tapped by `Tap Button`.
-- Tap `Tap Button` at least two times to switch from `Speed Pot` controll to `Tap Button` conntroll.
-  - Second tap must follow under 1,7s after first one.
+- Tap `Tap Button` at least two times to switch from `Speed Pot` control to `Tap Button` conntroll.
+  - Second tap must follow under 1,5s after first one.
   - Subsequent tap times are averaged until tapping finishes.
   - Tapping finishes if next tap is not performed for at least 3 times of the currently
-    tapped in tempo - `LED` blinks in the tapped tempo then on 50% duty cycle.
+    tapped in tempo - `LED` blinks in the tapped tempo then with 50% duty cycle.
   - Tapped in tempo is restricted to Hydra delay time boundarties while tapping it in.
-- Move `Speed Pot` at least 5% to switch controll back to it - `LED` is on without blinking then.
+- Long tap on `Tap Button` (over 1.5s) launches ramping down and up through the whole delay time range, until button is released.
+  - Ramping velocity depends on `Speed Pot` (cca 1s to 6s per cycle). `LED` blinks as ramping switches direction to indicate this velocity.
+  - Original delay time is restored after the button release.
+- Move `Speed Pot` at least 5% to switch control back to it - `LED` is on without blinking then.
 - `Tap to Head switch` (optional)
   - Selects if tapped in tempo targets _Head 2_ or _Head 4_. **Tip:** Tapping
     to _Head 2_ allows you to easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
   - Switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
-- Current `Speed Pot` or `Tap Button` controll state, together with the tapped in tempo, is preserved over the pedal power-off.
-- Long tap (over 2s) launches ramp function, ramping down and up through the whole delay time range, until button is released. Ramping speed depends on `Speed Pot`. Original speed is back after the release.
-  - Idea for another feature: Long tap enables/disables randow short Speed slowdown followed by Speed up back to the tapped in/pot tempo - idea from Rhett Shull video about tape delays
+- Current `Speed Pot` or `Tap Button` control state, together with the tapped in tempo, is preserved over the pedal power-off.
 
-## Applying module into Hydra effect
+_Idea for another feature:_ random short Speed slowdown followed by Speed up back to the tapped in/pot tempo - idea from Rhett Shull video about tape delays. How to enable it as we do not have spare controls?
+
+## Applying module into Hydra
 
 It is really easy:
 
-- Plan tap tempo module and all new controls placement in the pedal enclosure. Use
-  long enough wires for the placeent.
+- Plan tap tempo module and all new controls (`Tap Button`, `Tap to Head` switch) placement in the pedal enclosure. Use
+  long enough wires for the placement.
 - Do not solder `Speed` pot to the Hydra PCB, but connect its pads to the module instead:
   - closest to the PCB edge square one to `GND` - ground for the module.
   - center one to `O` - tempo voltage from the module back to the Hydra.
@@ -48,13 +51,11 @@ It is really easy:
 - `Tap to Head` switch - optional, single on/off switch, connect it to the module's `DIV` pads. Pads
   connected together is tapping to _Head 4_, disconnected is _Head 2_.
 
-**ToDo** Image How to connect taptempo module to Hydra PCB
-
 ## Building module
 
 Module schematics:
 
-![Module schematics](img/schematics.png)
+<img src="img/schematics.png" width="600px" alt="Module schematics">
 
 PCB BOM:
 
@@ -80,29 +81,28 @@ External components:
 
 PCB:
 
-![PCB](img/pcb.png)
+<img src="img/pcb.png" width="300px" alt="PCB">
 
 ## PWM calibration
 
 Source code contains constants for PWM calibration to Hydra delay time range.
-Used values were obtained from my Hydra and `C2=10u`, I'm not sure how much they can fluctuate for other builds.
+Used values were obtained from my Hydra and module build, I'm not sure how much they can fluctuate for other builds.
 
 ```c
-const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - on pwm=0 in ISR() method
-const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - on pwm=c_pwm_max in ISR() method
+const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - Speed pot on minimum
+const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - Speed pot on maximum
 const uint16_t c_delay_range = 702; // Computed as `c_delay_max` - `c_delay_min` [ms]
 ```
 
-Constants are used in `divtempo_to_pwm()` method.
+Constants are used in `divtempo_to_pwm()`, `pot_to_pwm()`, `divtempo_range()` methods and other places where necessary.
 
-If you have to recalibrate, set `pwm` in `ISR()` method to values mentioned in the comment, upload to u-controller, measure delay time, and change
-these constants. Characteristics is linear so end values are enough.
-At the end of the process, do not forget to return `ISR()` method to use `pwm` variable and upload valid firmware to u-controller ;-)
+If you have to recalibrate, set `Speed pot` as mentioned in the comment, upload to u-controller, measure delay time, and change
+these constants.
 
-I measured delay time using Ramp signal 100mV at 0.5Hz.
-Hydra must be on _Head 4_ only, Mix pot fully on the wet side to produce just delayed signal.
+I measured delay time using Ramp signal type from my signal generator, 100mV aplitude at 0.5Hz as an input.
+Hydra must be on _Head 4_ only, `Mix` pot fully on the wet side to produce just delayed signal.
 Two osciloscoppe channels hooked to Hydra In and Out, run manually triggered scan at `1s` Horizontal to get traces, then stop it.
-Then switch Horizontal to `100ms` or `50ms` and measureed subsequent In and Out edge distances.
+Then switch Horizontal to `100ms` or `50ms` and measure subsequent In and Out edge distances.
 
 ## Project Content
 
@@ -138,10 +138,10 @@ Non-functional changes:
 - LED now blinks with 50% tapped in time duty cycle (was on for constant 8ms in the original code).
 - Implemented delayed `tap=0` storing into EEPROM to keep `tap=1` during power-off, as
   `Speed Pot` value change may be detected by u-controller as power voltage drops.
-- Distinct code optimizatios.
+- Distinct code optimizations and refactorings to reuse common logic.
 - Lots of comments added as I learnt the code.
 
-All changes are marker by `MOD:` comment in the source code as accurately as possible.
+All changes are marker by `MOD:` comment in the source code as accurately as possible, but there were lots of them.
 
 ## License
 
