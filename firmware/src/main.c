@@ -1,40 +1,39 @@
 /*
- * FV1 Buddy - adaptation for [Hydra multi-headed delay](https://www.pedalpcb.com/product/pcb238/) pedal.
+ * Hydra Delay Taptempo Buddy - a "FV1 Buddy" adaptation for [Hydra multi-headed can delay](https://www.pedalpcb.com/product/pcb238/) pedal.
+ * This code is an ATtiny402 Tap Tempo module firmware for the Spin Semiconductors FV1 DSP used in Hydra delay - calibreated for it.
  *
- * Summer 2025
+ * August 2026
  * by Vlastimil Elias from Elvis Alive Tone
  *
  * MODs (marked in source code by `MOD:` comment):
  * - no "48kHz Clock Output" output (and related TCB0 timer config), pin is used for "Momentary Tap Tempo Button Input" instead
  * - Reset/UPDI pin stays unused/unchanged (was "Momentary Tap Tempo Button Input"), no high voltage programming necessary
  * - "Tempo Division Switch" functionality changed to select tempo tapping for head 2 (eight head) or 4 (quarter head). Implementation changed from ADC to digital input pin.
- * - `calib` function removed, Hydra's 900ms max delay time is hardcoded
+ * - `calib` function removed, Hydra's max and min delay times are hardcoded
+ * - `Speed Pot` and "Output" functionality reversed when compared to the original "Time" functionality, to adjust to the Hydra, where higher pot value is higher speed -> shorter delay
  * - corrected computiong of `pwm` value from `divtempo`
  * - main loop processing time optimalization (debounce() called only once) and bunch of patches and changes
- * - 'RAMP' feature on long tap removed
  * - changed EEPROM storing/retrieving code to work (`avr/eeprom.h` provided code doesn't work!)
  * - code comments added and improved
  *
- * Original FV1 Buddy code:
+ * Pinout (changed):
+ * 1: VDD
+ * 2: Momentary Tap Tempo Button Digital Input // MOD: used for "48kHz Clock Output" before
+ * 3: LED+ Output
+ * 4: Speed Potentiometer Analog Input // MOD: was "Time" before, reversed
+ * 5: Tempo Division Switch (On-On) Digitsal Input // MOD: was analog before for three states
+ * 6: Reset/UPDI, MOD: used for "Momentary Tap Tempo Button Input" before
+ * 7: PWM Output // MOD: reversed for "Speed" pot
+ * 8: GND
+ *
+ *
+ * From the original FV1 Buddy code:
  *
  * January 2022
  * by Antoine Ricoux for Electric Canary
  *
  *  https://electric-canary.com/FV1Buddy
  *  support@electric-canary.com
- *
- * This code is an ATtiny402 Tap Tempo & Clock for the Spin Semiconductors FV1 DSP
- * It can be calibrated for 700, 800, 900 & 1000ms delays.
- *
- * Pinout:
- * 1: VDD
- * 2: Momentary Tap Tempo Button Input, // MOD: used for "48kHz Clock Output" before
- * 3: LED+ Output
- * 4: Time Potentiometer Analog Input
- * 5: Tempo Division Switch (On-Off-On) Analog Input
- * 6: Reset/UPDI, MOD: used for "Momentary Tap Tempo Button Input" before
- * 7: PWM Output
- * 8: GND
  *
  * This code is shared under a BY-NC-SA Creative Commons License
  * Go here for complete license : https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
@@ -49,8 +48,8 @@
 #define PWM_PIN 3 // max voltage is shortest delay (max Speed)!
 #define TAP_PIN 6 // MOD: changed from 0 to 6 so we do not need to reconfigure UPDI pin
 #define LED_PIN 7
-#define POT_PIN 1 // higher voltage higher Speed -> shorter delay!
-#define DIV_PIN 2
+#define POT_PIN 1           // higher voltage higher Speed -> shorter delay!
+#define DIV_PIN 2           // connected to ground - head 2, on VCC by pull-up res or wire - head 4
 #define DEBOUNCE_TIME 900   // Tap tempo button debounce time [us]
 #define POT_MAX_VALUE 0x3FF // 10bit ADC max value to convert pot
 
@@ -60,14 +59,14 @@ const uint16_t EEPROM_TEMPO = 0x1401; // two bytes to store `mstempo` variable
 
 // MOD: constants for `pwm` value computation from `divtempo`
 const uint16_t c_pwm_max = 999;
-const uint16_t c_delay_max = 850;   // max delay from Hydra on head 4 [ms] - Speed pot on minimum
-const uint16_t c_delay_min = 148;   // min delay from Hydra on head 4 [ms] - Speed pot on maximum
-const uint16_t c_delay_range = 702; // Computed as `c_delay_max` - `c_delay_min` [ms]
+const uint16_t c_delay_max = 920;   // max delay from Hydra on head 4 [ms] - Speed pot on minimum
+const uint16_t c_delay_min = 150;   // min delay from Hydra on head 4 [ms] - Speed pot on maximum
+const uint16_t c_delay_range = 770; // Computed as `c_delay_max` - `c_delay_min` [ms]
 
 // MOD: store firmware revision info into uC binary code for further reference.
 // Must be volatile to be kept by compiler.
 // Starts by `rev ` to find it more easily in the binary.
-volatile char revision[] = "rev 0.1";
+volatile char revision[] = "rev_1";
 
 volatile uint16_t pot;       // current Pot value is stored here from ADC by interrupt handler
 volatile uint16_t pwm = 500; // current value of PWM output (between 0 and PWM_MAX) to be set into TCA in its interrupt handler
@@ -192,11 +191,11 @@ uint8_t divmult_from_diwsw(void)
         _delay_us(DEBOUNCE_TIME);
         if (!(PORTA.IN & (1 << DIV_PIN)))
         {
-            // pin switched to ground - head 2
+            // pin connected to ground - head 2
             return 2;
         }
     }
-    // pin on VCC by pull-up res - head 4
+    // pin on VCC by pull-up res or wire - head 4
     return 1;
 }
 
@@ -222,20 +221,20 @@ void eeprom_persist(void)
     sei();
 }
 
-// MOD: correct calculation of the `pwm` value from `pot` value and `c_delay_range` constant, extracted to method for reuse
+// MOD: correct calculation of the Speed `pwm` value from `pot` value and `c_delay_range` constant
 uint16_t pot_to_pwm(uint16_t pot)
 {
     return pot * (POT_MAX_VALUE / c_delay_range);
 }
 
-// MOD: compute correct PWM value from `divtempo` [ms] and Hydra measured dealay time range constants.
-// PWM must be opposite to tempo, as higher PWM is higher Speed -> shorter delay!
+// MOD: compute correct of the Speed `pwm` value from `divtempo` [ms] and Hydra measured dealay time range constants.
+// `pwm` value must be opposite to `divtempo` time, as higher pwm is higher Speed -> shorter delay!
 uint16_t divtempo_to_pwm(uint16_t divtempo)
 {
     return (uint16_t)(((uint32_t)(c_delay_max - divtempo) * c_pwm_max) / c_delay_range);
 }
 
-// MOD: check `divtempo` value is in range of [c_delay_min, c_delay_max] and correct it if not
+// MOD: check `divtempo` value is in range of `c_delay_min` .. `c_delay_max` and correct it if not
 uint16_t divtempo_range(uint16_t divtempo)
 {
     if (divtempo > c_delay_max)
@@ -446,7 +445,7 @@ int main(void)
         }
         else if (currentstate == 1 && laststate == 1) // Tap button keeps on
         {
-            if (ms >= 1500) // if button pressed more than 1.5s
+            if (ms >= 1000) // if button pressed more than 1s
             {
                 // Ramp feature - gradually increase/decrease delay time across whole range while button pressed, fluctuation speed depends on `pot` value
                 while (debounce())
