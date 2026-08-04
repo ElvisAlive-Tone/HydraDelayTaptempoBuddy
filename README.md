@@ -11,7 +11,7 @@ Finished in August 2026!
 ## Features
 
 - Delay time/tempo can be controlled by `Speed Pot` or tapped by `Tap Button`.
-- Tap `Tap Button` at least two times to switch from `Speed Pot` control to `Tap Button` conntroll.
+- Tap `Tap Button` at least two times to switch from `Speed Pot` control to `Tap Button` control.
   - Second tap must follow under 1,5s after first one.
   - Subsequent tap times are averaged until tapping finishes.
   - Tapping finishes if next tap is not performed for at least 3 times of the currently
@@ -23,15 +23,17 @@ Finished in August 2026!
 - Move `Speed Pot` at least 5% to switch control back to it - `LED` is on without blinking then.
 - `Tap to Head switch` (optional)
   - Selects if tapped in tempo targets _Head 2_ or _Head 4_. **Tip:** Tapping
-    to _Head 2_ allows you to easily set tempo in "eights" for "dotted eigts" played by _Head 3_.
-  - Switch change is not used immediatelly, but for the next tapping. Also used after next pedal power-on.
+    to _Head 2_ allows you to easily set tempo in "eights" for "dotted eights" played by _Head 3_.
+  - Switch change is not used immediately, but for the next tapping. Also used after next pedal power-on.
 - Current `Speed Pot` or `Tap Button` control state, together with the tapped in tempo, is preserved over the pedal power-off.
+- Trimmer or fixed resistor to set LED brightness.
+- UPDI pins to re-program soldered u-controller.
 
 _Idea for another feature:_ random short Speed slowdown followed by Speed up back to the tapped in/pot tempo - idea from Rhett Shull video about tape delays. How to enable it as we do not have spare controls?
 
 ## Project Content
 
-- **ToDo** `.hex` - firmware binary
+- `firmware.hex` - firmware binary
 - `firmware/` - VSCode/[PlatformIO](https://docs.platformio.org/en/latest/platforms/atmelmegaavr.html) project with firmware
 - `FV1BuddyForHydra.dch` - schematics
 - `FV1BuddyForHydra-rev1_gerber.zip` - Gerber file for PCB fabrication
